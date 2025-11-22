@@ -1,17 +1,13 @@
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
+import { StorageKeys } from "../config/StorageKeys";
 
-// --- 1. INTERFACE DEFINITIONS ---
-
-// Define the shape of the User object
 interface User {
     id: string;
     name: string;
     email: string;
-    // Add other properties you get from your login API response
 }
 
-// Define the state and actions of the User Store
 interface UserStoreState {
     isLoggedIn: boolean;
     user: User | null;
@@ -23,20 +19,16 @@ interface UserStoreState {
     initializeAuth: () => Promise<void>;
 }
 
-// --- 2. STORE IMPLEMENTATION ---
-
-const TOKEN_KEY = "userAccessTokenKey";
-
 export const useUserStore = create<UserStoreState>((set) => ({
-    // State initialization
     isLoggedIn: false,
     user: null,
     isLoadingAuth: true,
 
-    // 1. Check for token on app start
     initializeAuth: async () => {
+        set({ isLoadingAuth: true });
+
         try {
-            const token = await SecureStore.getItemAsync(TOKEN_KEY);
+            const token = await SecureStore.getItemAsync(StorageKeys.AUTH_TOKEN_KEY);
 
             if (token) {
                 // Token found. In a real app, you might validate the token
@@ -49,7 +41,6 @@ export const useUserStore = create<UserStoreState>((set) => ({
         } catch (error) {
             console.error("SecureStore access failed:", error);
         } finally {
-            // Set loading to false, allowing App.tsx to switch navigators
             set({ isLoadingAuth: false });
         }
     },
@@ -57,11 +48,11 @@ export const useUserStore = create<UserStoreState>((set) => ({
     // 2. Login (Store token securely and update state)
     login: async (token, user) => {
         // Save the token securely
-        await SecureStore.setItemAsync(TOKEN_KEY, token);
+        await SecureStore.setItemAsync(StorageKeys.AUTH_TOKEN_KEY, token);
 
         set({
-            isLoggedIn: true,
             user: user,
+            isLoggedIn: true,
             isLoadingAuth: false,
         });
     },
@@ -69,11 +60,11 @@ export const useUserStore = create<UserStoreState>((set) => ({
     // 3. Logout (Delete token securely and reset state)
     logout: async () => {
         // Delete the token securely
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(StorageKeys.AUTH_TOKEN_KEY);
 
         set({
-            isLoggedIn: false,
             user: null,
+            isLoggedIn: false,
             isLoadingAuth: false,
         });
     },

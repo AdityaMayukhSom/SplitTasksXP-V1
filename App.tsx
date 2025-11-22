@@ -10,7 +10,6 @@ import { useThemeStore } from "./src/store/useThemeStore";
 import { useUserStore } from "./src/store/useUserStore";
 import "./global.css";
 
-// 1. Initialize Query Client once outside the component tree
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
@@ -19,50 +18,30 @@ const queryClient = new QueryClient({
     },
 });
 
-// Suppress known warning related to non-serializable objects in navigation state
-// LogBox.ignoreLogs(["Non-serializable values were found in the navigation state"]);
+export const App = () => {
+    const auth = useUserStore();
+    const theme = useThemeStore();
 
-// The main application root logic
-const AppRoot = () => {
-    // Use state and actions from the stores
-    const isLoggedIn = useUserStore((state) => state.isLoggedIn);
-    const isLoadingAuth = useUserStore((state) => state.isLoadingAuth);
-    const initializeAuth = useUserStore((state) => state.initializeAuth);
-    const initializeTheme = useThemeStore((state) => state.initializeTheme);
-
-    // Get the current color scheme for NativeWind
-    const colorScheme = useThemeStore((state) => state.currentColorScheme);
-    const isDark = colorScheme === "dark";
-
-    // Run initialization logic on component mount
     useEffect(() => {
-        initializeAuth();
-        initializeTheme();
+        auth.initializeAuth();
+        theme.initializeTheme();
     }, []);
 
-    if (isLoadingAuth) {
+    if (auth.isLoadingAuth) {
         // Show the custom loading screen while we wait for SecureStore to check the token
         return <LoadingScreen />;
     }
 
     return (
-        // FINAL FIX: Using View instead of the non-existent TailwindProvider
-        <View style={{ flex: 1 }} className={`bg-background-light dark:bg-background-dark`}>
-            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-
-            <NavigationContainer>
-                {/* Conditional rendering based on auth state */}
-                {isLoggedIn ? <AppNavigator /> : <AuthNavigator />}
-            </NavigationContainer>
-        </View>
-    );
-};
-
-// The top-level provider wrapper
-export default function App() {
-    return (
         <QueryClientProvider client={queryClient}>
-            <AppRoot />
+            <View style={{ flex: 1 }} className={`bg-background-light dark:bg-background-dark`}>
+                <StatusBar barStyle={theme.isDark() ? "light-content" : "dark-content"} />
+
+                <NavigationContainer>
+                    {/* Depending upon whether logged in or not */}
+                    {auth.isLoggedIn ? <AppNavigator /> : <AuthNavigator />}
+                </NavigationContainer>
+            </View>
         </QueryClientProvider>
     );
-}
+};

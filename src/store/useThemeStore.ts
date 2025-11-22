@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Appearance } from "react-native";
-
-const THEME_KEY = "app_theme_preference";
+import { StorageKeys } from "../config/StorageKeys";
 
 const darkColorSchemes = ["dark"] as const;
 const lightColorSchemes = ["light"] as const;
@@ -18,8 +17,6 @@ interface ThemeState {
     currentColorScheme: ColorScheme;
 
     isDark: () => boolean;
-
-    // Actions
     setTheme: (newTheme: Theme) => void;
     initializeTheme: () => Promise<void>;
 }
@@ -33,12 +30,8 @@ const getActiveScheme = (preference: Theme): ColorScheme => {
 };
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-    theme: "system", // Default preference
-
-    // Initial calculation based on current system preference
+    theme: "system",
     currentColorScheme: getActiveScheme("system"),
-
-    // --- Actions ---
 
     isDark: (): boolean => {
         const ccs = get().currentColorScheme as string;
@@ -52,10 +45,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     },
 
     setTheme: (newTheme) => {
-        // 1. Persist the new preference
-        AsyncStorage.setItem(THEME_KEY, newTheme);
-
-        // 2. Determine the active scheme and update state
+        AsyncStorage.setItem(StorageKeys.THEME_KEY, newTheme);
         const activeScheme = getActiveScheme(newTheme);
 
         set({
@@ -68,24 +58,33 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
     initializeTheme: async () => {
         try {
-            // 1. Load preference from AsyncStorage
-            const storedTheme = (await AsyncStorage.getItem(THEME_KEY)) as Theme | null;
-            const initialPreference: Theme = storedTheme || "system";
+            // if no stored theme, use system theme by default
+            const storedTheme = await AsyncStorage.getItem(StorageKeys.THEME_KEY);
+            const currTheme = (storedTheme || "system") as Theme;
 
-            // 2. Set the state based on the loaded preference
             set({
-                theme: initialPreference,
-                currentColorScheme: getActiveScheme(initialPreference),
+                theme: currTheme,
+                currentColorScheme: getActiveScheme(currTheme),
             });
 
-            // 3. Set up listener for system changes (only relevant if preference is 'system')
+            // Set up listener for OS theme change, when user chooses 'system' theme, If the user
+            // specifically chooses for a light or dark theme inside the app, global OS changed
+            // should not matter. A question might be why we're adding listener and checking if the
+            // theme is system inside the listener, when we could have checked theme preference
+            // first and skipped the listener attachment. Answer to that is if the user changes the
+            // theme to system while using the application, the listener will catch it and act, but
+            // if there was no listener initially, changing the theme midway in application wouldn't
+            // trigger computing the theme based on user's OS preference.
             Appearance.addChangeListener(({ colorScheme }) => {
-                if (get().theme === "system") {
+                const userPreferredTheme = get().theme;
+                // if the current preferred theme for user is not `system` then whatever appearance
+                // this listener detects does not matter
+                if (userPreferredTheme === "system") {
                     // Update the active scheme if the user prefers 'system' and the device changes
-                    set({
-                        currentColorScheme: colorScheme || "light",
-                    });
-                    console.log(`System theme changed. Active scheme updated to: ${colorScheme}`);
+                    set({ currentColorScheme: colorScheme || "light" });
+                    console.log(`System color scheme changed. Active scheme updated to: ${colorScheme}`);
+                } else {
+                    console.log(`System color scheme changed: ${colorScheme}. User prefers ${userPreferredTheme}`);
                 }
             });
             console.log("Theme initialization complete.");
